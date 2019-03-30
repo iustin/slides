@@ -25,10 +25,13 @@
 - Not to be used as security tool!
 - Case 1: `cd` into directory that is then moved outside of chroot dir
 - Case 2: `chroot()` without `cd /`, which defeats the purpose
+- The only guarantee it that it changes the root, not that you cannot
+  change it back
+  - see <https://lkml.org/lkml/2007/9/25/434> ☺
 
-# FreeBSD jails
+# Other attempts
 
-## beyond simple chroot
+## FreeBSD jails
 
 - First introduced in FreeBSD version 4 in March 2000
 - More powerful than simple `chroot()`
@@ -36,7 +39,7 @@
 - Note: I don't have practical experience with them, so take the below
   data with a grain of salt
 
-## basics
+## FreeBSD jails - basics
 - Jails expand chroot by "…by virtualizing access to the file system, the
   set of users, and the networking subsystem"
 - A jail is characterized by four elements:
@@ -50,7 +53,7 @@
     jail. The path is relative to the root directory of the jail
     environment.
 
-## limitations
+## FreeBSD jails - limitations
 
 - As you can see, the focus is on _restricting_ the jail, not on
   actually virtualising the resources
@@ -65,6 +68,25 @@
   - [man
    page](https://www.freebsd.org/cgi/man.cgi?query=jail&sektion=&n=1)
   - [the handbook](https://www.freebsd.org/doc/handbook/jails.html)
+
+## OpenVZ - first attempt at Linux containers
+
+- First release way back in 2005
+- Available in distributions as early as 2006 (Debian; via custom
+  kernel)
+- Main goal was to enable large-scale hosting
+- Did actual containerisation based on patched kernels
+  - … they re-implemented/used separated mechanisms for a lot of the
+    container work (CPU isolation, disk quota, user resources)
+  - … and they were never fully merged
+  - but they had working checkpoint/restore, including live migration
+    (!)
+- Significant parts of the kernel code was contributed to upstream
+  - initial namespaces, `uts`, `pid`, `net`, etc. (see later)
+- Over time seems (subjective) to have decreased in importance as a
+  solution in its own
+  - by 2015, most of the code (incl. management) was open-sourced
+- <https://openvz.org>
 
 # Linux namespaces
 
@@ -95,6 +117,7 @@
 - These are shared/visible to a tree of processes
 - As of kernel 4.10, there are 7 (6+1) namespace types
 - 3 boring ones, 3 interesting ones, 1 magical
+  - the magical one enables real containers
 
 ## interlude: capabilities
 
@@ -122,6 +145,7 @@
   - introduced in 2.6.19 as `CONFIG_IPC_NS`
   - requires `CAP_SYS_ADMIN`
   - does anyone use this anymore in the http-world?
+    - yes: `ipcs|wc -l` → 48 entries on my machine
 
 ## Cgroup namespace
 
@@ -160,7 +184,7 @@
 
 ## Net namespace #1
 
-- Introduced in 2.6.24, but completed only in 2.6.29
+- Introduced in 2.6.24 as `CONFIG_NET_NS`, but completed in 2.6.29
 - A network namespace virtualises/provides an isolated view of many
   network-related things:
   - network devices! a network device lives in a single namespace
@@ -180,7 +204,7 @@
 # ip -o l
 1: lo: …
 2: eth0: …
-# unshare -n
+# unshare --net
 # ip -o l
 1: lo: …
 #
@@ -194,25 +218,24 @@
 ```
 # ip link set veth2-right netns ns-right
 ```
-- And can configure (in both namespaces) the interfaces and the needed routing
-
-## Net namespace #3 - use cases
-
-- Ensuring software build process doesn't connect to the network
-- Isolating arbitrary IP addresses
+- And can configure (in both namespaces) the interfaces and the needed
+  routing
+- Very practical use cases (e.g. no-net software builds in Debian)
 
 ## PID namespaces
 
 - Introduced in 2.6.24 as `CONFIG_PID_NS`
-- This isolated the process ID numbers, such that processes in
-  different namespaces can have PID 666
-- This is a hierarchical type of namespace, meaning a process is
-  present (visible) it its namespace and all parent namespaces
-- Alternatively, a process can see all processes in its PID namespace
-  and all descendant namespaces
-- A process has a different PID in each of the namespaces it is
-  present in
-- Level of nesting is, as of 3.7, 32
+- The namespace isolates the process ID numbers
+  - multiple processes in different namespaces can have PID 666!
+- This is a hierarchical namespace type, meaning a process is present
+  (visible) it its namespace and all parent namespaces
+  - alternatively, a process can see all processes in its PID
+    namespace and all descendant namespaces
+  - a process has a different PID in each of the namespaces it is
+    present in
+  - level of nesting is, as of 3.7, 32
+- This makes syscalls that operate on process IDs interesting
+  - always interpreted in the caller's namespace
 - Requires `CAP_SYS_ADMIN`
 
 ## PID namespaces #2 - peculiarities
@@ -223,10 +246,11 @@
 - Thus, a `setns()` only changes the _namespace for future
   children_ of this process, not for the process itself
 - Thus these children will have a parent PID not in their own
-  namespace, thus `getppid()` returns 0
-- A further interesting aspect is that one can only navigate
-  (`setns()`) downwards, not upwards; not even to go back to its
-  original namespace
+  namespace!
+  - `getppid()` returns 0 in such cases
+- A further interesting aspect is that one can only navigate—via
+  `setns()`—downwards, not upwards
+  - not even to go back to its original namespace!
 
 ## PID namespaces #3 - everybody can be init!
 
@@ -242,7 +266,7 @@
 - `reboot()` in this namespace works (and terminates it)
   - yay for user experience!
 
-# The magical user namespace
+# Finally, the magical user namespace
 
 ## why is this special?
 
@@ -252,14 +276,15 @@
 test@debian:~$ id
 uid=1001(test) gid=1001(test) groups=1001(test)
 test@debian:~$ unshare --user
-nobody@debian:~$ id
+nobody@debian:~$ id; exit
 uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
-nobody@debian:~$ logout
 test@debian:~$ unshare --user --map-root-user
 root@debian:~# id
 uid=0(root) gid=0(root) groups=0(root)
 ```
-- Well, at least as long as
+- Well, at least as long as things are not disabled!
+  - see <https://lwn.net/Articles/673597/>
+  - on Debian,
 ```
 echo 1 > /proc/sys/kernel/unprivileged_userns_clone
 ```
@@ -267,7 +292,7 @@ echo 1 > /proc/sys/kernel/unprivileged_userns_clone
 ## so what? fake root, right?
 
 - Yes, but having root (actually, all capabilities) means a lot in
-  this specific namespace and the _non-user namespaces owned by it_
+  this specific namespace _and in the non-user namespaces owned by it_
 - E.g. one can mount various virtual file-systems in this namespace:
 ```
 test@debian:~$ unshare --user --map-root-user --mount
@@ -279,10 +304,12 @@ none            998M     0  998M   0% /mnt
 - Basically, when a non-user-namespace is created, it is owned by the
   user namespace in which the creating process was a member at the
   time of the creation of the namespace
-- Having `CAP_SYS_ADMIN` in a descendant user namespace is not quite
-  the real thing, but close
+  - all your _(other)_ namespaces are belong to me
+- Having `CAP_SYS_ADMIN` in a (non-initial) user namespace is not
+  quite the real thing
+  - but close enough!
 
-## how much root?
+## how much _root_?
 
 - you can't change some global things
   - e.g. the system time; not _yet_ virtualised, semantics complex,
@@ -294,6 +321,10 @@ none            998M     0  998M   0% /mnt
 - you don't have full read permissions either
   - e.g. `dmesg` to read the kernel logs, if they were originally
     disallowed
+- but the more 'normal' root parts (if coupled with other namespaces)
+  are there
+  - create interfaces, set firewall rules, kill random processes,
+    change file ownership, reboot the namespace, listen on port 80, …
 
 ## more details
 
@@ -313,18 +344,26 @@ none            998M     0  998M   0% /mnt
 
 - A process is member of exactly one user namespace
 - Moving to a different user namespace…:
-  - is possible if you have `CAP_SYS_ADMIN` in that namespace
+  - is possible if you have `CAP_SYS_ADMIN` in the target namespace
   - and if you are single-threaded (all threads must belong to a
     single namespace)
   - gives full set of capabilities in the target namespace, but you
     lose capabilities in the parent namespace
-  - which means you can't re-join a namespace; _goodbye is forever!_
-- Privileges can differ between inside the user namespace and outside
-  it
+    - which means you can't re-join a namespace; _goodbye is forever!_
+- Privileges can differ between inside the user namespace and
+  "outside" it
   - this makes sense if you think in terms of other namespaces which
     are owned by this user namespace
   - I can own my UTS namespace, and thus can change the hostname, but
-    don't own my network namespace, thus can't list firewall rules
+    don't own my network namespace, thus can't list firewall rules,
+    even with `CAP_NET_ADMIN`
+```
+test@debian:~$ unshare --user --map-root-user
+root@debian:~# iptables -L
+iptables: Permission denied (you must be root).
+root@debian:~# id
+uid=0(root) gid=0(root) groups=0(root)
+```
 
 
 ## user and group IDs
@@ -333,7 +372,6 @@ none            998M     0  998M   0% /mnt
 ```
 test@debian:~$ unshare --user --map-root-user
 root@debian:~# date > /tmp/foo; exit
-logout
 test@debian:~$ ls -l /tmp/foo
 -rw-r--r-- 1 test test 29 Mar 30 15:29 /tmp/foo
 
@@ -359,17 +397,21 @@ root@debian:~# ls -l /tmp/foo
 ## user and group ID mappings
 
 - In order to switch user/group IDs within the namespace, a mapping
-  has to be created; i.e., what is user 1000 inside the namespace
-  equivalent to, in the parent namespace?
-- It is done by mapping multiple ranges of contiguous IDs between
-  parent and child namespace
+  has to be created
+  - i.e., what is user 1000 inside the namespace equivalent to, in the
+    parent namespace?
+- It is done by mapping ranges of contiguous IDs between parent and
+  child
   - e.g. IDs 0-5'000 in the child namespace will be mapped to
     100'000-105'000 in the parent
   - the mapping is used when accessing resources in the parent
     namespace
-  - there are funny limitations about the mapping
-- A single mapping (with 1 ID) is allowed for non-privileged processed
-  (in the parent NS), or full with `CAP_SETUID`/`CAP_SETGID`
+  - there are funny limitations about the mapping (340 entries!)
+  - mapping can only be set once
+- A single mapping (with 1 ID) is allowed for non-privileged processes
+  - processes with `CAP_SETUID`/`CAP_SETGID` can set arbitrary
+    mappings
+  - how about nested namespaces? it is fun!
 - Technically, see `/proc/$pid/uid_map` (and `gid_map`), and read
   `user_namespaces(7)`
 
@@ -387,8 +429,9 @@ root@debian:~# ls -l /tmp/foo
   - unmapped IDs will still be seen as the overflow ID
   - `setuid`/`setgid` programs works as expected if there is a
     mapping!
-- Even with a mapping, it's trivial to see unmapped IDs, when looking
-  at things outside your user namespace!
+- Even with a mapping, you'll see often unmapped IDs
+  - e.g. when looking at processes outside your user namespace
+  - or at file permissions
 
 # Conclusion
 
@@ -397,7 +440,7 @@ root@debian:~# ls -l /tmp/foo
 - `setns(2)`: switches one or more namespaces:
   - `ls -l /proc/self/ns/`
   - bind-mount those directories somewhere else to persist the
-    namespace beyond lifetime of single process
+    namespace beyond lifetime of a single process
   - `setns(2)` takes argument a file descriptor to one such directory
 - `unshare(2)`: unshares parts of the execution context
   - it means it can create new namespaces
@@ -427,3 +470,6 @@ root@debian:~# ls -l /tmp/foo
 - Start reading man page `namespaces(7)`, and all the "SEE ALSO" pages
 - …
 - Profit!
+- Note: no man pages have been harmed while writing this.
+
+### Thanks!
