@@ -1,6 +1,6 @@
 % Namespaces
-% Iustin Pop
-% March 29th, 2019
+% Iustin Pop, <iustin@k1024.org>
+% March 30th, 2019
 
 ## About
 
