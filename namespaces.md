@@ -368,31 +368,25 @@ uid=0(root) gid=0(root) groups=0(root)
 
 ## user and group IDs
 
-- Remember the exercise before:
-```
-test@debian:~$ unshare --user --map-root-user
-root@debian:~# date > /tmp/foo; exit
-test@debian:~$ ls -l /tmp/foo
--rw-r--r-- 1 test test 29 Mar 30 15:29 /tmp/foo
+::: incremental
 
-```
-
+- Inside user corresponds to what?
+-     test@debian:~$ unshare --user --map-root-user
+      root@debian:~# date > /tmp/foo; exit
+      test@debian:~$ ls -l /tmp/foo
+      -rw-r--r-- 1 test test 29 Mar 30 15:29 /tmp/foo
 - OK, so root user inside the NS is my user; what about other users?
-```
-test@debian:~$ unshare --user --map-root-user
-root@debian:~# su - more-test
-su: Authentication failure
-```
+-     test@debian:~$ unshare --user --map-root-user
+      root@debian:~# su - more-test
+      su: Authentication failure
+- But can I see their files at least?
+-     test@debian:~$ ls -l /tmp/foo
+      -rw-r--r-- 1 more-test test 32 Mar 30 15:39 /tmp/foo
+      test@debian:~$ unshare --user --map-root-user
+      root@debian:~# ls -l /tmp/foo
+      -rw-r--r-- 1 nobody root 32 Mar 30 15:39 /tmp/foo
 
-. . .
-
-```
-test@debian:~$ ls -l /tmp/foo
--rw-r--r-- 1 more-test test 32 Mar 30 15:39 /tmp/foo
-test@debian:~$ unshare --user --map-root-user
-root@debian:~# ls -l /tmp/foo
--rw-r--r-- 1 nobody root 32 Mar 30 15:39 /tmp/foo
-```
+:::
 
 ## user and group ID mappings
 
