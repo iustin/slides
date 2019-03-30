@@ -443,7 +443,7 @@ root@debian:~# ls -l /tmp/foo
     namespace beyond lifetime of a single process
   - `setns(2)` takes argument a file descriptor to one such directory
 - `unshare(2)`: unshares parts of the execution context
-  - it means it can create new namespaces
+  - it means it can create new namespaces (before switching to them)
   - but also other things related to `CLONE_*` flags
 - speaking of which, `clone(2)` is very much worth reading, to
   understand how complex process relationships are
@@ -459,7 +459,7 @@ root@debian:~# ls -l /tmp/foo
   - what's your name (`CLONE_NEWUTS`)
   - where you are (`CLONE_NEWNS`)
   - who you can see (`CLONE_NEWPID`)
-  - where you can go (`CLONE_NETNET`)
+  - where you can go (`CLONE_NEWNET`)
 - But you can run an un-trusted random binary with no worries
   - … well, except kernel bugs
   - or configuration bugs
