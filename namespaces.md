@@ -8,7 +8,8 @@
   random web sites
 - Main goal was to solidify my own understanding of the issue
 - Corrections very welcome!
-- … but note this glances over a million small details
+  - but note this glances over a million small details
+  - note: licensed as CC BY-SA 4.0
 
 # In the beginning…
 
