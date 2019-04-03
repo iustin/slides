@@ -4,9 +4,10 @@
 
 ## About
 
-- A set of slides with information gathered from man pages, Wikipedia,
-  random web sites
+- A set of slides with information gathered from various places
+  - man pages, Wikipedia, blog posts, mailing list archives, etc.
 - Main goal was to solidify my own understanding of the issue
+  - and present a somewhat logical introduction to this complex topic
 - Corrections very welcome!
   - but note this glances over a million small details
   - note: licensed as CC BY-SA 4.0
