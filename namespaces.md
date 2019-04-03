@@ -11,6 +11,7 @@
 - Corrections very welcome!
   - but note this glances over a million small details
   - note: licensed as CC BY-SA 4.0
+  - send patches to <https://github.com/iustin/slides/>
 
 # In the beginning…
 
