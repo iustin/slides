@@ -231,7 +231,7 @@
 - The namespace isolates the process ID numbers
   - multiple processes in different namespaces can have PID 666!
 - This is a hierarchical namespace type, meaning a process is present
-  (visible) it its namespace and all parent namespaces
+  (visible) in its namespace and all parent namespaces
   - alternatively, a process can see all processes in its PID
     namespace and all descendant namespaces
   - a process has a different PID in each of the namespaces it is
@@ -318,6 +318,8 @@ none            998M     0  998M   0% /mnt
   - e.g. the system time; not _yet_ virtualised, semantics complex,
     see this [LWN article](https://lwn.net/Articles/766089/), first
     proposed in 2006…
+    - UPDATE: landed on Linux 5.6, which was released in March 2020
+      (see [the introduction](https://lwn.net/Articles/779104/))
   - you can't load kernel modules, or create devices (`mknod`)
   - and you can't mount any block-based filesystems (only `procfs`,
     `sysfs`, `devpts`, `tmpfs`, `ramfs`, `mqueue`, `bpf`)
